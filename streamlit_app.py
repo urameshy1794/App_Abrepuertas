@@ -5,7 +5,7 @@ import unicodedata
 DB_PATH = "data.db"
 TABLE = "direcciones"
 
-st.set_page_config(page_title="Buscador por Dirección", page_icon="🔎", layout="wide")
+st.set_page_config(page_title="Celso se la come", page_icon="🔎", layout="wide")
 st.title("🔎 Buscador por Dirección")
 
 st.caption("Busca por ejemplo: `av los sauces nro 123` (no importa mayúsculas, tildes o 'av.' vs 'avenida').")
@@ -99,3 +99,4 @@ if submit and q.strip():
         st.info("No se encontraron coincidencias.")
 else:
     st.info("Ingresa una dirección y presiona **Buscar**.")
+
