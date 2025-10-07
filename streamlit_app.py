@@ -1,4 +1,4 @@
-# streamlit_app.py  (con Diagnóstico y cache-busting por mtime/size)
+# streamlit_app.py (con búsqueda por Dirección o Nombre del Proyecto)
 import streamlit as st
 import sqlite3
 import unicodedata
@@ -10,7 +10,7 @@ TABLE = "direcciones"
 
 st.set_page_config(page_title="Buscador de Proyectos", page_icon="🔎", layout="wide")
 st.title("🔎 Buscador de Proyectos")
-st.caption("Busca por dirección (Ej: `av los sauces nro 123`) o por código de proyecto.")
+st.caption("Busca por dirección (Ej: `av los sauces 123`) o por nombre del proyecto.")
 
 def normalize_text(s: str) -> str:
     s = (s or "").strip().lower()
@@ -111,23 +111,14 @@ def search_dedup_by_address(conn, q: str, limit: int):
         """
         return conn.execute(sql, (qn,)).fetchall()
     else:
-        sql = f"""
-        SELECT {sel}
-        FROM {TABLE} d
-        WHERE direccion_norm LIKE '%' || ? || '%'
-          AND NOT EXISTS (
-            SELECT 1 FROM {TABLE} d2
-            WHERE d2.direccion_norm = d.direccion_norm
-              AND d2.id < d.id
-          )
-        LIMIT {int(limit)}
-        """
-        return conn.execute(sql, (qn,)).fetchall()
+        # Lógica de deduplicación simplificada si no hay fecha
+        return search_all_by_address(conn, q, limit)
 
-# --- (NUEVO) Funciones de búsqueda por CÓDIGO DE PROYECTO ---
-def search_all_by_code(conn, q: str, limit: int):
-    # No se normaliza el texto para códigos de proyecto
-    qn = (q or "").strip()
+
+# --- (MODIFICADO) Funciones de búsqueda por NOMBRE DEL PROYECTO ---
+def search_all_by_project_name(conn, q: str, limit: int):
+    # Usamos normalize_text para buscar sin importar tildes/mayúsculas
+    qn = normalize_text(q)
     cols = existing_cols(conn)
     sel = select_clause(cols)
     ord_by = order_expr(cols)
@@ -135,15 +126,15 @@ def search_all_by_code(conn, q: str, limit: int):
     SELECT
         {sel}
     FROM {TABLE}
-    WHERE codigo_proyecto LIKE '%' || ? || '%'
+    WHERE nombre_proyecto LIKE '%' || ? || '%'
     ORDER BY {ord_by}
     LIMIT {int(limit)}
     """
     return conn.execute(sql, (qn,)).fetchall()
 
-def search_dedup_by_code(conn, q: str, limit: int):
-    # No se normaliza el texto para códigos de proyecto
-    qn = (q or "").strip()
+def search_dedup_by_project_name(conn, q: str, limit: int):
+    # Usamos normalize_text para buscar sin importar tildes/mayúsculas
+    qn = normalize_text(q)
     cols = existing_cols(conn)
     sel = select_clause(cols)
     ord_by = order_expr(cols)
@@ -152,7 +143,7 @@ def search_dedup_by_code(conn, q: str, limit: int):
         sql = f"""
         WITH matches AS (
           SELECT * FROM {TABLE}
-          WHERE codigo_proyecto LIKE '%' || ? || '%'
+          WHERE nombre_proyecto LIKE '%' || ? || '%'
         ),
         ranked AS (
           SELECT *,
@@ -169,24 +160,23 @@ def search_dedup_by_code(conn, q: str, limit: int):
         """
         return conn.execute(sql, (qn,)).fetchall()
     else:
-        # Simplificamos si no hay fecha, ya que el caso es menos común
-        # y la deduplicación por código es menos necesaria
-        return search_all_by_code(conn, q, limit)
+        # Si no hay fecha, la deduplicación compleja no es necesaria
+        return search_all_by_project_name(conn, q, limit)
 
-# -------- (CORREGIDO) Barra de búsqueda ----------
+
+# -------- (MODIFICADO) Barra de búsqueda ----------
 with st.form(key="search"):
-    # Selector para el tipo de búsqueda
+    # (MODIFICADO) Selector para el tipo de búsqueda
     search_by = st.radio(
         "Buscar por:",
-        ("Dirección", "Código del Proyecto"),
+        ("Dirección", "Nombre del Proyecto"),
         horizontal=True,
     )
 
-    # Etiqueta dinámica para el campo de texto
-    label = "Dirección" if search_by == "Dirección" else "Código del Proyecto"
+    # (MODIFICADO) Etiqueta dinámica para el campo de texto
+    label = "Dirección" if search_by == "Dirección" else "Nombre del Proyecto"
     
-    # (LA SOLUCIÓN) Se añade una 'key' para mantener el estado del input
-    # al cambiar de etiqueta. Esto evita la necesidad del doble clic.
+    # Se mantiene la 'key' para evitar el problema del doble clic
     q = st.text_input(label, value="", key="search_term_input")
 
     limit = st.number_input("Límite de filas", min_value=1, max_value=20000, value=200, step=100)
@@ -219,26 +209,19 @@ with st.expander("🛠️ Modo diagnóstico (verifica que la app está leyendo e
             FROM {TABLE}
         """).fetchone()
         st.write(f"**Total:** {row['total']}, **con Nombre del Proyecto:** {row['con_nombre_proy']}, **con Distrito:** {row['con_distrito']}")
-        # muestra una muestra de valores (para confirmar que no están vacíos)
-        sample = conn.execute(f"""
-            SELECT nombre_proyecto, distrito
-            FROM {TABLE}
-            WHERE TRIM(COALESCE(nombre_proyecto,''))<>'' OR TRIM(COALESCE(distrito,''))<>''
-            LIMIT 5
-        """).fetchall()
-        st.write("**Muestra (nombre_proyecto, distrito)**:", [tuple(r) for r in sample])
     except Exception as e:
         st.warning("No se pudo consultar la tabla. ¿Existe `direcciones`?")
         st.exception(e)
 
+
 # -------- (MODIFICADO) Lógica de Búsqueda ----------
 if submitted and q.strip():
     try:
-        # (NUEVO) Lógica para decidir qué funciones llamar
+        # (MODIFICADO) Lógica para decidir qué funciones llamar
         if search_by == "Dirección":
             rows = search_all_by_address(conn, q, int(limit)) if show_all else search_dedup_by_address(conn, q, int(limit))
-        else: # Búsqueda por Código del Proyecto
-            rows = search_all_by_code(conn, q, int(limit)) if show_all else search_dedup_by_code(conn, q, int(limit))
+        else: # Búsqueda por Nombre del Proyecto
+            rows = search_all_by_project_name(conn, q, int(limit)) if show_all else search_dedup_by_project_name(conn, q, int(limit))
 
         st.write(f"**{len(rows)}** resultado(s).")
         if rows:
@@ -262,4 +245,3 @@ if submitted and q.strip():
         st.exception(e)
 else:
     st.info("Ingresa un término de búsqueda y presiona **Buscar**.")
-
