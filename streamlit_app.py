@@ -173,18 +173,21 @@ def search_dedup_by_code(conn, q: str, limit: int):
         # y la deduplicación por código es menos necesaria
         return search_all_by_code(conn, q, limit)
 
-# -------- (MODIFICADO) Barra de búsqueda ----------
+# -------- (CORREGIDO) Barra de búsqueda ----------
 with st.form(key="search"):
-    # (NUEVO) Selector para el tipo de búsqueda
+    # Selector para el tipo de búsqueda
     search_by = st.radio(
         "Buscar por:",
         ("Dirección", "Código del Proyecto"),
         horizontal=True,
     )
 
-    # (NUEVO) Etiqueta dinámica para el campo de texto
+    # Etiqueta dinámica para el campo de texto
     label = "Dirección" if search_by == "Dirección" else "Código del Proyecto"
-    q = st.text_input(label, value="")
+    
+    # (LA SOLUCIÓN) Se añade una 'key' para mantener el estado del input
+    # al cambiar de etiqueta. Esto evita la necesidad del doble clic.
+    q = st.text_input(label, value="", key="search_term_input")
 
     limit = st.number_input("Límite de filas", min_value=1, max_value=20000, value=200, step=100)
     show_all = st.toggle("Mostrar todas las coincidencias (sin deduplicar)", value=True)
@@ -259,3 +262,4 @@ if submitted and q.strip():
         st.exception(e)
 else:
     st.info("Ingresa un término de búsqueda y presiona **Buscar**.")
+
