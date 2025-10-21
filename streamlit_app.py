@@ -53,15 +53,17 @@ def order_expr(cols: set) -> str:
     else:
         return "id ASC"
 
-# --- (MODIFICADO) Se añaden las nuevas columnas a la cláusula SELECT ---
+# --- (MODIFICADO) Se ajusta el nombre de la columna a minúsculas ---
 def select_clause(cols: set) -> str:
     parts = [
         col_or_blank("fecha_final_abrepuertas", "Fecha", cols),
         col_or_blank("codigo_proyecto", "Código", cols),
         col_or_blank("direccion_full", "Dirección", cols),
         # --- INICIO DE MODIFICACIÓN ---
-        col_or_blank("Numero", "Numero", cols),
-        col_or_blank("nombre_gestor_dni", "Nombre del gestor - DNI", cols), # Nota: Se asume que en la DB la columna es 'nombre_gestor_dni'
+        # Se busca 'numero' en minúsculas. Si en tu DB es 'Numero' u otro, ajústalo aquí.
+        # Puedes verificar el nombre exacto en el 'Modo diagnóstico' de la app.
+        col_or_blank("numero", "Numero", cols), 
+        col_or_blank("nombre_gestor_dni", "Nombre del gestor - DNI", cols),
         # --- FIN DE MODIFICACIÓN ---
         col_or_blank("distrito", "Distrito", cols),
         col_or_blank("nombre_proyecto", "Nombre del Proyecto", cols),
