@@ -1,4 +1,3 @@
-# streamlit_app.py (con búsqueda por Dirección o Nombre del Proyecto)
 import streamlit as st
 import sqlite3
 import unicodedata
@@ -16,7 +15,7 @@ def normalize_text(s: str) -> str:
     s = (s or "").strip().lower()
     s = "".join(ch for ch in unicodedata.normalize("NFD", s) if unicodedata.category(ch) != "Mn")
     s = (s.replace("avenida", "av").replace("av.", "av")
-          .replace(" jiron", " jr").replace("jiron", "jr"))
+         .replace(" jiron", " jr").replace("jiron", "jr"))
     s = " ".join(s.split())
     return s
 
@@ -54,11 +53,16 @@ def order_expr(cols: set) -> str:
     else:
         return "id ASC"
 
+# --- (MODIFICADO) Se añaden las nuevas columnas a la cláusula SELECT ---
 def select_clause(cols: set) -> str:
     parts = [
         col_or_blank("fecha_final_abrepuertas", "Fecha", cols),
         col_or_blank("codigo_proyecto", "Código", cols),
         col_or_blank("direccion_full", "Dirección", cols),
+        # --- INICIO DE MODIFICACIÓN ---
+        col_or_blank("Numero", "Numero", cols),
+        col_or_blank("nombre_gestor_dni", "Nombre del gestor - DNI", cols), # Nota: Se asume que en la DB la columna es 'nombre_gestor_dni'
+        # --- FIN DE MODIFICACIÓN ---
         col_or_blank("distrito", "Distrito", cols),
         col_or_blank("nombre_proyecto", "Nombre del Proyecto", cols),
         col_or_blank("item_plan_general_ip_general", "ITEM PLAN GENERAL - IP GENERAL", cols),
@@ -115,7 +119,7 @@ def search_dedup_by_address(conn, q: str, limit: int):
         return search_all_by_address(conn, q, limit)
 
 
-# --- (MODIFICADO) Funciones de búsqueda por NOMBRE DEL PROYECTO ---
+# --- Funciones de búsqueda por NOMBRE DEL PROYECTO ---
 def search_all_by_project_name(conn, q: str, limit: int):
     # Usamos normalize_text para buscar sin importar tildes/mayúsculas
     qn = normalize_text(q)
@@ -164,19 +168,16 @@ def search_dedup_by_project_name(conn, q: str, limit: int):
         return search_all_by_project_name(conn, q, limit)
 
 
-# -------- (MODIFICADO) Barra de búsqueda ----------
+# -------- Barra de búsqueda ----------
 with st.form(key="search"):
-    # (MODIFICADO) Selector para el tipo de búsqueda
     search_by = st.radio(
         "Buscar por:",
         ("Dirección", "Nombre del Proyecto"),
         horizontal=True,
     )
 
-    # (MODIFICADO) Etiqueta dinámica para el campo de texto
     label = "Dirección" if search_by == "Dirección" else "Nombre del Proyecto"
     
-    # Se mantiene la 'key' para evitar el problema del doble clic
     q = st.text_input(label, value="", key="search_term_input")
 
     limit = st.number_input("Límite de filas", min_value=1, max_value=20000, value=200, step=100)
@@ -187,7 +188,7 @@ with st.form(key="search"):
 sig = db_signature(DB_PATH)
 conn = get_conn(DB_PATH, sig)
 
-# -------- Diagnóstico (sin cambios) ----------
+# -------- Diagnóstico ----------
 with st.expander("🛠️ Modo diagnóstico (verifica que la app está leyendo el data.db correcto)"):
     try:
         size = os.path.getsize(DB_PATH)
@@ -214,10 +215,9 @@ with st.expander("🛠️ Modo diagnóstico (verifica que la app está leyendo e
         st.exception(e)
 
 
-# -------- (MODIFICADO) Lógica de Búsqueda ----------
+# -------- Lógica de Búsqueda ----------
 if submitted and q.strip():
     try:
-        # (MODIFICADO) Lógica para decidir qué funciones llamar
         if search_by == "Dirección":
             rows = search_all_by_address(conn, q, int(limit)) if show_all else search_dedup_by_address(conn, q, int(limit))
         else: # Búsqueda por Nombre del Proyecto
@@ -225,11 +225,15 @@ if submitted and q.strip():
 
         st.write(f"**{len(rows)}** resultado(s).")
         if rows:
-            # El código para mostrar los datos no necesita cambios
+            # --- (MODIFICADO) Se añaden las nuevas columnas al diccionario para el DataFrame ---
             data = [{
                 "Fecha": r["Fecha"],
                 "Código": r["Código"],
                 "Dirección": r["Dirección"],
+                # --- INICIO DE MODIFICACIÓN ---
+                "Numero": r["Numero"],
+                "Nombre del gestor - DNI": r["Nombre del gestor - DNI"],
+                # --- FIN DE MODIFICACIÓN ---
                 "Distrito": r["Distrito"],
                 "Nombre del Proyecto": r["Nombre del Proyecto"],
                 "ITEM PLAN GENERAL - IP GENERAL": r["ITEM PLAN GENERAL - IP GENERAL"],
@@ -245,3 +249,4 @@ if submitted and q.strip():
         st.exception(e)
 else:
     st.info("Ingresa un término de búsqueda y presiona **Buscar**.")
+
