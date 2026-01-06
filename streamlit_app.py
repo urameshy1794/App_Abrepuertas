@@ -7,8 +7,8 @@ from datetime import datetime
 DB_PATH = "data.db"
 TABLE = "direcciones"
 
-st.set_page_config(page_title="Buscador de Proyectos - Salesland", page_icon="🔎", layout="wide")
-st.title("🔎 Buscador de Proyectos")
+st.set_page_config(page_title="Buscador de Proyectos", page_icon="🔎", layout="wide")
+st.title("🔎 Buscador de Proyectos - Salesland")
 st.caption("Busca por dirección (Ej: `av los sauces 123`) o por nombre del proyecto.")
 
 def normalize_text(s: str) -> str:
@@ -177,6 +177,7 @@ if submitted and q.strip():
         st.exception(e)
 else:
     st.info("Ingresa un término de búsqueda.")
+
 
 
 
